@@ -19,7 +19,7 @@ public:
     // 更新用户的状态信息
     bool updateState(User user);
 private:
-}
+};
 
 
 #endif //CHAT_USERMODEL_HPP

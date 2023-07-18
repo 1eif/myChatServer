@@ -4,6 +4,7 @@
 #include "chatservice.hpp"
 #include "public.hpp"
 #include <muduo/base/Logging.h>
+#include "user.hpp"
 
 using namespace muduo;
 
@@ -38,12 +39,82 @@ MsgHandler ChatService::getHandler(int msgid) {
 }
 
 // 业务
-// 登录
+// 登录   检测密码是否正确
 void ChatService::login(const TcpConnectionPtr &conn, json &js, Timestamp time) {
-    LOG_INFO << "login service!!!!";
+
+    int id = js["id"];
+    string pwd = js["password"];
+
+    User user = userModel_.query(id);
+
+    if (user.getId() == id && user.getPwd() == pwd) {
+        if (user.getState() == "online") {
+            // 该用户已经登录 不允许重复登录
+            LOG_INFO << "do login service failed, user is already online";
+            json response;
+            response["msgid"] = LOGIN_MSG_ACK;
+            response["errno"] = 2;
+            response["errmsg"] = "该用户已经登录";
+            conn->send(response.dump());
+            return;
+        } else {
+
+            {
+                // 互斥锁
+                lock_guard<mutex> lock(connMutex_);
+                // 登录成功，记录用户连接信息
+                userConnMap_.insert({id, conn});
+            }
+
+            // 登录成功 更新用户状态信息
+            LOG_INFO << "do login service success";
+
+            user.setState("online");
+            userModel_.updateState(user);
+
+            json response;
+            response["msgid"] = LOGIN_MSG_ACK;
+            response["errno"] = 0;
+            response["id"] = user.getId();
+            response["name"] = user.getName();
+            conn->send(response.dump());
+        }
+
+    } else {
+        // 登录失败 用户不存在或者密码错误
+        LOG_INFO << "do login service failed";
+        json response;
+        response["msgid"] = LOGIN_MSG_ACK;
+        response["errno"] = 1;
+        response["errmsg"] = "用户名或密码错误";
+        conn->send(response.dump());
+    }
 }
 
-// 注册
+// 注册   name pwd
 void ChatService::reg(const TcpConnectionPtr &conn, json &js, Timestamp time) {
-    LOG_INFO << "register service!!!!";
+    string name = js["name"];
+    string pwd = js["password"];
+
+    User user;
+    user.setName(name);
+    user.setPwd(pwd);
+
+    bool state = userModel_.insert(user);
+    if (state) {
+        // 注册成功
+        LOG_INFO << "do reg service success";
+        json response;
+        response["msgid"] = REG_MSG_ACK;
+        response["errno"] = 0;
+        response["id"] = user.getId();
+        conn->send(response.dump());
+    } else {
+        // 注册失败
+        LOG_INFO << "do reg service failed";
+        json response;
+        response["msgid"] = REG_MSG_ACK;
+        response["errno"] = 1;
+        conn->send(response.dump());
+    }
 }
