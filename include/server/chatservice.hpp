@@ -8,9 +8,11 @@
 #include <unordered_map>
 #include <functional>
 #include <muduo/net/TcpConnection.h>
-#include "UserModel.hpp"
+#include "server/model/UserModel.hpp"
 #include <mutex>
-#include "OfflinemessageModel.hpp"
+#include "server/model/OfflinemessageModel.hpp"
+#include "server/model/FriendModel.hpp"
+#include "server/model/GroupModel.hpp"
 
 using namespace std;
 using namespace muduo;
@@ -43,6 +45,21 @@ public:
     // 一对一聊天业务
     void oneChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
+    // 服务器异常 重置
+    void reset();
+
+    // 添加好友
+    void addFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    // 创建群组
+    void createGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    // 加入群组
+    void addGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    // 群聊天
+    void groupChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
 private:
     ChatService();
 
@@ -60,6 +77,13 @@ private:
 
     // 存储离线消息的model对象
     OfflineMessageModel offlineMessageModel_;
+
+    // 存储好友列表的model对象
+    FriendModel friendModel_;
+
+    // 存储群组列表的model对象
+    GroupModel groupModel_;
+
 };
 
 #endif //CHAT_CHATSERVICE_HPP
