@@ -10,6 +10,7 @@
 #include <muduo/net/TcpConnection.h>
 #include "UserModel.hpp"
 #include <mutex>
+#include "OfflinemessageModel.hpp"
 
 using namespace std;
 using namespace muduo;
@@ -39,6 +40,9 @@ public:
     // 处理客户端异常退出
     void clientCloseException(const TcpConnectionPtr &conn);
 
+    // 一对一聊天业务
+    void oneChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
 private:
     ChatService();
 
@@ -53,6 +57,9 @@ private:
 
     // 定义互斥锁，保证userConnMap_的线程安全
     mutex connMutex_;
+
+    // 存储离线消息的model对象
+    OfflineMessageModel offlineMessageModel_;
 };
 
 #endif //CHAT_CHATSERVICE_HPP

@@ -7,7 +7,7 @@
 
 #include "user.hpp"
 
-// User表的数据操作类
+// // 提供user表的操作接口方法
 class UserModel {
 public:
     // User表的增加方法

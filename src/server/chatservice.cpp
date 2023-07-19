@@ -5,7 +5,9 @@
 #include "public.hpp"
 #include <muduo/base/Logging.h>
 #include "user.hpp"
+#include <vector>
 
+using namespace std;
 using namespace muduo;
 
 // 获取单例对象的接口函数
@@ -18,6 +20,7 @@ ChatService *ChatService::instance() {
 ChatService::ChatService() {
     msgHandlerMap_.insert({LOGIN_MSG, bind(&ChatService::login, this, _1, _2, _3)});
     msgHandlerMap_.insert({REG_MSG, bind(&ChatService::reg, this, _1, _2, _3)});
+    msgHandlerMap_.insert({ONE_CHAT_MSG, bind(&ChatService::oneChat, this, _1, _2, _3)});
 }
 
 // 获取消息对应处理器
@@ -77,6 +80,15 @@ void ChatService::login(const TcpConnectionPtr &conn, json &js, Timestamp time) 
             response["errno"] = 0;
             response["id"] = user.getId();
             response["name"] = user.getName();
+
+            // 查询该用户是否有离线消息
+            vector<string> vec = offlineMessageModel_.query(id);
+
+            if (!vec.empty()) {
+                response["offlinemsg"] = vec;
+                // 读取该用户的离线消息后，把该用户的所有离线消息删除
+                offlineMessageModel_.remove(id);
+            }
             conn->send(response.dump());
         }
 
@@ -142,5 +154,25 @@ void ChatService::clientCloseException(const TcpConnectionPtr &conn) {
         user.setState("offline");
         userModel_.updateState(user);
     }
+}
 
+
+// 一对一聊天业务
+void ChatService::oneChat(const TcpConnectionPtr &conn, json &js, Timestamp time) {
+    int toid = js["to"].get<int>();
+
+    // 加锁
+    {
+        lock_guard<mutex> lock(connMutex_);
+        auto it = userConnMap_.find(toid);
+
+        if (it != userConnMap_.end()) {
+            // 在线，转发消息
+            it->second->send(js.dump());
+            return;
+        }
+    }
+
+    // 不在线，存储离线消息
+    offlineMessageModel_.insert(toid, js.dump());
 }
